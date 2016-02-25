@@ -1,0 +1,5 @@
+virtualenv
+MongoDB
+
+# pycharm
+.idea

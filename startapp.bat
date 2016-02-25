@@ -1,0 +1,1 @@
+start MongoDB\mongod.exe --dbpath MongoDB\db
