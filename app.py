@@ -17,14 +17,21 @@ def index():
     return render_template('index.html')
 
 
-@app.route('/locations/')
+@app.route('/locations')
 def getLocations():
+
+    r = request
+    searchList = []
+    searchDict = {} # potential for selecting a subset
+
+    if 'parID' in request.args.keys():
+        searchList.append({"properties.parID": request.args['parID']})
+        searchDict["$and"] = searchList
 
     client = MongoClient()
     db = client.EI_Toets
     collection = db["EIdata"]
 
-    searchDict = {} # potential for selecting a subset
     mongocursor = collection.find(searchDict)
 
     timeseries = []
@@ -55,7 +62,7 @@ def getLocations():
     return json.dumps(uniqLocationsDict)
 
 
-@app.route('/parameters/')
+@app.route('/parameters')
 def getParameters():
 
     client = MongoClient()

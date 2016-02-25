@@ -1,3 +1,4 @@
 flask
+requests
 pymongo
 gdal 2.0.2

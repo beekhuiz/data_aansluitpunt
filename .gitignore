@@ -3,3 +3,5 @@ MongoDB
 
 # pycharm
 .idea
+
+*.py[cod]
