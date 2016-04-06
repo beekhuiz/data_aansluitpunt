@@ -93,28 +93,32 @@ def getParameters():
 @app.route('/avg')
 def getAverage():
 
-    parID = request.args['parID']
-    locID = request.args['locID']
-
-    client = MongoClient()
-    db = client.EI_Toets
-    collection = db["EIdata"]
-
     searchList = []
-    searchDict = {} # potential for selecting a subset
 
-    searchList.append({"properties.parID": parID})
-    searchList.append({"properties.locID": locID})
-    searchDict["$and"] = searchList
+    if 'parID' in request.args.keys():
+        searchList.append({"properties.parID": request.args['parID']})
 
-    mongocursor = collection.find(searchDict)
+    if 'locID' in request.args.keys():
+        searchList.append({"properties.locID": request.args['locID']})
 
-    timeseries = []
-    for record in mongocursor:
-        del record['_id'] # remove mongoID, that should not be part of the output (and is not JSON Serializable)
-        timeseries.append(record)
+    if searchList:
+        client = MongoClient()
+        db = client.EI_Toets
+        collection = db["EIdata"]
 
-    return json.dumps(timeseries)
+        searchDict = {} # potential for selecting a subset
+        searchDict["$and"] = searchList
+
+        mongocursor = collection.find(searchDict)
+
+        timeseries = []
+        for record in mongocursor:
+            del record['_id'] # remove mongoID, that should not be part of the output (and is not JSON Serializable)
+            timeseries.append(record)
+
+        return json.dumps(timeseries)
+    else:
+        return "Please give a parID and/or a locID as request parameters"
 
 
 
