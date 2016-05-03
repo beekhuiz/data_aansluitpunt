@@ -2,6 +2,7 @@ import os
 from flask import Flask, jsonify, request, render_template, session, redirect, url_for, flash, send_from_directory
 from pymongo import MongoClient
 import requests
+from requests.auth import HTTPBasicAuth
 #import gis_functions       # NOT NEEDED (YET)
 import json
 from operator import itemgetter  # used for sorting dictionary lists of unique locations, parameters and sources alphabetically
@@ -12,9 +13,102 @@ my_dir = os.path.dirname(__file__)
 
 app.config['DEVELOP'] = True
 
+# Load in norm data in memory for fast access
+RIVMString = requests.get('https://rvs.rivm.nl/zoeksysteem/Data/SubtanceNormValues')
+RIVMDict = json.loads(RIVMString.text)  # convert json string to python dict
+normsList = RIVMDict['norms']
+substancesList = RIVMDict['substances']
+
+
 @app.route('/')
 def index():
     return render_template('index.html')
+
+
+@app.route('/norms')
+def getNorms():
+
+    r = request
+
+    if 'parCode' in request.args.keys():
+        parCode = request.args['parCode']
+
+        normIDList = []
+
+        # find the norm id of this substance by aquocode
+        for substance in substancesList:
+            if substance['aquoCode'] == parCode:
+                norms = substance['norms']
+
+                for norm in norms:
+                    normIDList.append(norm['id'])
+
+
+        # get the processingmethodcodes based on the retrieved id
+        normsForSubstanceDict = {}
+        normsForSubstanceList = []
+
+        for normID in normIDList:
+            for norm in normsList:
+                if norm['id'] == normID:
+                    normsForSubstanceList.append(norm)
+
+        normsForSubstanceDict['norms'] = normsForSubstanceList
+
+
+
+        #region Get calculation method from RIVM normendatabase
+
+        normIDList = []
+        valueProcessingMethodCode = ''
+
+        # find the norm id of this substance by aquocode
+        for substance in substancesList:
+            if substance['aquoCode'] == parCode:
+                norms = substance['norms']
+
+                for norm in norms:
+                    normIDList.append(norm['id'])
+
+
+
+        # TODO: UPDATE NORMS
+        # # get the processingmethodcodes based on the retrieved id
+        # normsForSubstanceList = []
+        #
+        # if normIDList:
+        #     for normID in normIDList:
+        #         for norm in normsList:
+        #             if norm['id'] == normID:
+        #                 normInfoDict = {}
+        #                 normInfoDict['valueProcessingMethodCode'] = norm['valueProcessingMethodCode']
+        #                 normInfoDict['valueProcessingMethodDescription'] = norm['valueProcessingMethodDescription']
+        #                 normInfoDict['id'] = norm['id']
+        #                 normInfoDict['stateCode'] = norm['stateCode']
+        #                 normInfoDict['stateDescription'] = norm['stateDescription']
+        #                 normInfoDict['normDescription'] = norm['normDescription']
+        #                 normsForSubstanceList.append(normInfoDict)
+        #
+        #
+        # #EIData['normsForSubstanceList'] = normsForSubstanceList
+        #
+        # # Get all the norms that have the same Norm StateCode as the metadata Hoedanigheidcode of the DDL-measurements
+        # normsForSubstanceStateCodeList = []
+        # valueProcessingMethodCodeList = []
+        #
+        # # match the norm stateCode with the Hoedanigheidscode
+        # for normInfo in normsForSubstanceList:
+        #     if normInfo['stateCode'] == EIData['hoedanigheidCode']:
+        #         normsForSubstanceStateCodeList.append(normInfo)
+        #         valueProcessingMethodCodeList.append(normInfo['valueProcessingMethodCode'])
+        #
+        # #EIData['normsForSubstanceStateCodeList'] = normsForSubstanceStateCodeList
+
+
+        return json.dumps(normsForSubstanceDict)
+    else:
+        return "Please give a valid aquo code 'parCode' as GET parameter"
+
 
 
 @app.route('/locations')
@@ -24,13 +118,13 @@ def getLocations():
     searchList = []
     searchDict = {} # potential for selecting a subset
 
-    if 'parID' in request.args.keys():
-        searchList.append({"properties.parID": request.args['parID']})
+    if 'parCode' in request.args.keys():
+        searchList.append({"properties.aquoParCode": request.args['parCode']})
         searchDict["$and"] = searchList
 
     client = MongoClient()
     db = client.EI_Toets
-    collection = db["EIdata"]
+    collection = db["EIData"]
 
     mongocursor = collection.find(searchDict)
 
@@ -67,7 +161,7 @@ def getParameters():
 
     client = MongoClient()
     db = client.EI_Toets
-    collection = db["EIdata"]
+    collection = db["EIData"]
 
     searchDict = {} # potential for selecting a subset
     mongocursor = collection.find(searchDict)
@@ -79,13 +173,13 @@ def getParameters():
         del record['_id'] # remove mongoID, that should not be part of the output (and is not JSON Serializable)
         timeseries.append(record)
 
-    uniqParIDSeries = list({v['properties']['parID']: v for v in timeseries}.values())
+    uniqParCodeSeries = list({v['properties']['aquoParCode']: v for v in timeseries}.values())
     uniqParList = []
-    for uniqParIDSerie in uniqParIDSeries:
-        uniqParList.append({'parID': uniqParIDSerie['properties']['parID'],
-                            'parName': uniqParIDSerie['properties']['parName'],
-                            'parDesc': uniqParIDSerie['properties']['parDescription']})
-    uniqParList = sorted(uniqParList, key=itemgetter('parName'))  # sort alphabetically
+    for uniqParCodeSerie in uniqParCodeSeries:
+        uniqParList.append({'aquoParCode': uniqParCodeSerie['properties']['aquoParCode'],
+                            'aquoParOmschrijving': uniqParCodeSerie['properties']['aquoParOmschrijving'],
+                            'parDescription': uniqParCodeSerie['properties']['parDescription']})
+    uniqParList = sorted(uniqParList, key=itemgetter('aquoParOmschrijving'))  # sort alphabetically
 
     return json.dumps(uniqParList)
 
@@ -95,8 +189,8 @@ def getAverage():
 
     searchList = []
 
-    if 'parID' in request.args.keys():
-        searchList.append({"properties.parID": request.args['parID']})
+    if 'parCode' in request.args.keys():
+        searchList.append({"properties.aquoParCode": request.args['parCode']})
 
     if 'locID' in request.args.keys():
         searchList.append({"properties.locID": request.args['locID']})
@@ -104,7 +198,7 @@ def getAverage():
     if searchList:
         client = MongoClient()
         db = client.EI_Toets
-        collection = db["EIdata"]
+        collection = db["EIData"]
 
         searchDict = {} # potential for selecting a subset
         searchDict["$and"] = searchList
@@ -118,11 +212,12 @@ def getAverage():
 
         return json.dumps(timeseries)
     else:
-        return "Please give a parID and/or a locID as request parameters"
+        return "Please give a parCode and/or a locID as request parameters"
 
 
 
 if __name__ == '__main__':
+
     if app.config['DEVELOP']:
         app.run(debug=True)                 # DEVELOPMENT
     else:
