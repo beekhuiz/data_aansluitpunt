@@ -1,5 +1,5 @@
 import os
-from flask import Flask, jsonify, request, render_template, session, redirect, url_for, flash, send_from_directory
+from flask import Flask, Response, jsonify, request, render_template, session, redirect, url_for, flash, send_from_directory
 from pymongo import MongoClient
 import requests
 from requests.auth import HTTPBasicAuth
@@ -104,8 +104,12 @@ def getNorms():
         #
         # #EIData['normsForSubstanceStateCodeList'] = normsForSubstanceStateCodeList
 
+        resp = Response(json.dumps(normsForSubstanceDict))
+        resp.headers['Access-Control-Allow-Origin'] = '*'
+        resp.mimetype = 'application/json'
+        return resp
 
-        return json.dumps(normsForSubstanceDict)
+        #return json.dumps(normsForSubstanceDict)
     else:
         return "Please give a valid aquo code 'parCode' as GET parameter"
 
@@ -153,7 +157,12 @@ def getLocations():
     uniqLocationsDict['type'] = "FeatureCollection"
     uniqLocationsDict['features'] = uniqLocList
 
-    return json.dumps(uniqLocationsDict)
+    #return json.dumps(uniqLocationsDict)
+
+    resp = Response(json.dumps(uniqLocationsDict))
+    resp.headers['Access-Control-Allow-Origin'] = '*'
+    resp.mimetype = 'application/json'
+    return resp
 
 
 @app.route('/parameters')
@@ -181,7 +190,11 @@ def getParameters():
                             'parDescription': uniqParCodeSerie['properties']['parDescription']})
     uniqParList = sorted(uniqParList, key=itemgetter('aquoParOmschrijving'))  # sort alphabetically
 
-    return json.dumps(uniqParList)
+    #return json.dumps(uniqParList)
+    resp = Response(json.dumps(uniqParList))
+    resp.headers['Access-Control-Allow-Origin'] = '*'
+    resp.mimetype = 'application/json'
+    return resp
 
 
 @app.route('/avg')
@@ -210,10 +223,13 @@ def getAverage():
             del record['_id'] # remove mongoID, that should not be part of the output (and is not JSON Serializable)
             timeseries.append(record)
 
-        return json.dumps(timeseries)
+        resp = Response(json.dumps(timeseries))
+        resp.headers['Access-Control-Allow-Origin'] = '*'
+        resp.mimetype = 'application/json'
+        return resp
+        #return json.dumps(timeseries)
     else:
         return "Please give a parCode and/or a locID as request parameters"
-
 
 
 if __name__ == '__main__':
