@@ -124,7 +124,12 @@ def getLocations():
 
     if 'parCode' in request.args.keys():
         searchList.append({"properties.aquoParCode": request.args['parCode']})
-        searchDict["$and"] = searchList
+
+
+    if 'locID' in request.args.keys():
+        searchList.append({"properties.locID": request.args['locID']})
+
+    searchDict["$and"] = searchList
 
     client = MongoClient()
     db = client.EI_Toets
