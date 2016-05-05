@@ -28,88 +28,70 @@ def index():
 @app.route('/norms')
 def getNorms():
 
-    r = request
-
     if 'parCode' in request.args.keys():
         parCode = request.args['parCode']
 
-        normIDList = []
+        allInfo = {}
+
+        normsForSubstance = []
 
         # find the norm id of this substance by aquocode
         for substance in substancesList:
             if substance['aquoCode'] == parCode:
+
+                #region store info of this substance
+                allInfo['aquoCode'] = substance['aquoCode']
+                allInfo['name'] = substance['name']
+                allInfo['englishName'] = substance['englishName']
+                allInfo['casNumber'] = substance['casNumber']
+                allInfo['hasZzsEntry'] = substance['hasZzsEntry']
+                #endregion
+
+                # go through all norms of this substance
                 norms = substance['norms']
 
                 for norm in norms:
-                    normIDList.append(norm['id'])
 
+                    normData = {}
+                    normData['value'] = norm['value']
 
-        # get the processingmethodcodes based on the retrieved id
-        normsForSubstanceDict = {}
-        normsForSubstanceList = []
+                    #region get the norm ID and retrieve all info of the norm ID out of the norms dictionary
+                    normID = norm['id']
+                    normInfo = {}
 
-        for normID in normIDList:
-            for norm in normsList:
-                if norm['id'] == normID:
-                    normsForSubstanceList.append(norm)
+                    for norm in normsList:
+                        if norm['id'] == normID:
+                            normInfo['id'] = norm['id']
+                            normInfo['description'] = norm['description']
+                            normInfo['compartmentName'] = norm['compartmentName']
+                            normInfo['categoryDescription'] = norm['categoryDescription']
+                            normInfo['normCode'] = norm['normCode']
+                            normInfo['normDescription'] = norm['normDescription']
+                            normInfo['normSubgroupCode'] = norm['normSubgroupCode']
+                            normInfo['normSubgroupDescription'] = norm['normSubgroupDescription']
+                            normInfo['compartmentCode'] = norm['compartmentCode']
+                            normInfo['compartmentDescription'] = norm['compartmentDescription']
+                            normInfo['compartmentSubgroupCode'] = norm['compartmentSubgroupCode']
+                            normInfo['compartmentSubgroupDescription'] = norm['compartmentSubgroupDescription']
+                            normInfo['quantityCode'] = norm['quantityCode']
+                            normInfo['quantityDescription'] = norm['quantityDescription']
+                            normInfo['stateCode'] = norm['stateCode']
+                            normInfo['stateDescription'] = norm['stateDescription']
+                            normInfo['valueProcessingMethodCode'] = norm['valueProcessingMethodCode']
+                            normInfo['valueProcessingMethodDescription'] = norm['valueProcessingMethodDescription']
 
-        normsForSubstanceDict['norms'] = normsForSubstanceList
+                    normData['info'] = normInfo
+                    #endregion
 
+                    normsForSubstance.append(normData)
 
+        allInfo['norms'] = normsForSubstance
 
-        #region Get calculation method from RIVM normendatabase
-
-        normIDList = []
-        valueProcessingMethodCode = ''
-
-        # find the norm id of this substance by aquocode
-        for substance in substancesList:
-            if substance['aquoCode'] == parCode:
-                norms = substance['norms']
-
-                for norm in norms:
-                    normIDList.append(norm['id'])
-
-
-
-        # TODO: UPDATE NORMS
-        # # get the processingmethodcodes based on the retrieved id
-        # normsForSubstanceList = []
-        #
-        # if normIDList:
-        #     for normID in normIDList:
-        #         for norm in normsList:
-        #             if norm['id'] == normID:
-        #                 normInfoDict = {}
-        #                 normInfoDict['valueProcessingMethodCode'] = norm['valueProcessingMethodCode']
-        #                 normInfoDict['valueProcessingMethodDescription'] = norm['valueProcessingMethodDescription']
-        #                 normInfoDict['id'] = norm['id']
-        #                 normInfoDict['stateCode'] = norm['stateCode']
-        #                 normInfoDict['stateDescription'] = norm['stateDescription']
-        #                 normInfoDict['normDescription'] = norm['normDescription']
-        #                 normsForSubstanceList.append(normInfoDict)
-        #
-        #
-        # #EIData['normsForSubstanceList'] = normsForSubstanceList
-        #
-        # # Get all the norms that have the same Norm StateCode as the metadata Hoedanigheidcode of the DDL-measurements
-        # normsForSubstanceStateCodeList = []
-        # valueProcessingMethodCodeList = []
-        #
-        # # match the norm stateCode with the Hoedanigheidscode
-        # for normInfo in normsForSubstanceList:
-        #     if normInfo['stateCode'] == EIData['hoedanigheidCode']:
-        #         normsForSubstanceStateCodeList.append(normInfo)
-        #         valueProcessingMethodCodeList.append(normInfo['valueProcessingMethodCode'])
-        #
-        # #EIData['normsForSubstanceStateCodeList'] = normsForSubstanceStateCodeList
-
-        resp = Response(json.dumps(normsForSubstanceDict))
+        resp = Response(json.dumps(allInfo))
         resp.headers['Access-Control-Allow-Origin'] = '*'
         resp.mimetype = 'application/json'
         return resp
 
-        #return json.dumps(normsForSubstanceDict)
     else:
         return "Please give a valid aquo code 'parCode' as GET parameter"
 
@@ -118,18 +100,17 @@ def getNorms():
 @app.route('/locations')
 def getLocations():
 
-    r = request
     searchList = []
-    searchDict = {} # potential for selecting a subset
 
     if 'parCode' in request.args.keys():
         searchList.append({"properties.aquoParCode": request.args['parCode']})
 
-
     if 'locID' in request.args.keys():
         searchList.append({"properties.locID": request.args['locID']})
 
-    searchDict["$and"] = searchList
+    searchDict = {}
+    if searchList:
+        searchDict["$and"] = searchList
 
     client = MongoClient()
     db = client.EI_Toets
@@ -161,8 +142,6 @@ def getLocations():
     uniqLocationsDict = {}
     uniqLocationsDict['type'] = "FeatureCollection"
     uniqLocationsDict['features'] = uniqLocList
-
-    #return json.dumps(uniqLocationsDict)
 
     resp = Response(json.dumps(uniqLocationsDict))
     resp.headers['Access-Control-Allow-Origin'] = '*'
@@ -232,7 +211,6 @@ def getAverage():
         resp.headers['Access-Control-Allow-Origin'] = '*'
         resp.mimetype = 'application/json'
         return resp
-        #return json.dumps(timeseries)
     else:
         return "Please give a parCode and/or a locID as request parameters"
 
