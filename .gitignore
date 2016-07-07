@@ -5,3 +5,5 @@ MongoDB
 .idea
 
 *.py[cod]
+
+config.ini
