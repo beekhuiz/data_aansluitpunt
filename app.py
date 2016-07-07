@@ -9,13 +9,17 @@ from operator import itemgetter  # used for sorting dictionary lists of unique l
 #from flask.ext.cors import CORS # somehow doesnt work?
 from datetime import timedelta
 from functools import update_wrapper
+import ConfigParser
+
+Config = ConfigParser.ConfigParser()
+Config.read("config.ini")
 
 app = Flask(__name__)
-#CORS(app)     # somehow doesnt work?
-app.config['SECRET_KEY'] = 'gukfdshkjdsoipee'
-my_dir = os.path.dirname(__file__)
 
-app.config['DEVELOP'] = True
+app.config['SECRET_KEY'] = Config.get('SectionOne', 'secret_key')
+app.config['DEVELOP'] = Config.get('SectionOne', 'develop') in ['True', 'true', '1']
+
+my_dir = os.path.dirname(__file__)
 
 # Load in norm data in memory for fast access
 RIVMString = requests.get('https://rvs.rivm.nl/zoeksysteem/Data/SubtanceNormValues')
@@ -25,6 +29,17 @@ substancesList = RIVMDict['substances']
 
 
 def crossdomain(origin=None, methods=None, headers=None, max_age=21600, attach_to_all=True, automatic_options=True):
+    """
+    This function set all header information to allow for crossdomain requests
+    :param origin:
+    :param methods:
+    :param headers:
+    :param max_age:
+    :param attach_to_all:
+    :param automatic_options:
+    :return:
+    """
+
     if methods is not None:
         methods = ', '.join(sorted(x.upper() for x in methods))
     if headers is not None and not isinstance(headers, basestring):
@@ -75,6 +90,9 @@ def index():
 @app.route('/norms', methods=['GET', 'OPTIONS'])
 @crossdomain(origin='*')
 def getNorms():
+    """
+    get the norms for a substance, or get all norms
+    """
 
     r =request
 
@@ -149,6 +167,10 @@ def getNorms():
 @app.route('/locations', methods=['GET', 'OPTIONS'])
 @crossdomain(origin='*')
 def getLocations():
+    """
+    Get all unique timeseries location information for a certain parameter and / or locationID
+    :return: JSON containing the locations
+    """
 
     searchList = []
 
@@ -199,6 +221,10 @@ def getLocations():
 @app.route('/parameters', methods=['GET', 'OPTIONS'])
 @crossdomain(origin='*')
 def getParameters():
+    """
+    Get all the Aquo parameters in the database
+    :return:
+    """
 
     client = MongoClient()
     db = client.EI_Toets
@@ -228,6 +254,11 @@ def getParameters():
 @app.route('/avg', methods=['GET', 'OPTIONS'])
 @crossdomain(origin='*')
 def getAverage():
+    """
+    get the timeseries average (including all additional information necessary to interpret the average) for a
+    combination of a location and parameter
+    :return:
+    """
 
     searchList = []
 
@@ -251,11 +282,6 @@ def getAverage():
         for record in mongocursor:
             del record['_id'] # remove mongoID, that should not be part of the output (and is not JSON Serializable)
             timeseries.append(record)
-
-        # resp = Response(json.dumps(timeseries))
-        # resp.headers['Access-Control-Allow-Origin'] = '*'
-        # resp.mimetype = 'application/json'
-        # return resp
 
         return json.dumps(timeseries)
 
