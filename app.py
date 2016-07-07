@@ -55,6 +55,8 @@ def crossdomain(origin=None, methods=None, headers=None, max_age=21600, attach_t
             h['Access-Control-Allow-Origin'] = origin
             h['Access-Control-Allow-Methods'] = get_methods()
             h['Access-Control-Max-Age'] = str(max_age)
+            h['Access-Control-Allow-Headers'] = 'x-requested-with'
+
             if headers is not None:
                 h['Access-Control-Allow-Headers'] = headers
             return resp
@@ -63,14 +65,18 @@ def crossdomain(origin=None, methods=None, headers=None, max_age=21600, attach_t
         return update_wrapper(wrapped_function, f)
     return decorator
 
+
 @app.route('/', methods=['GET', 'OPTIONS'])
 @crossdomain(origin='*')
 def index():
     return render_template('index.html')
 
+
 @app.route('/norms', methods=['GET', 'OPTIONS'])
 @crossdomain(origin='*')
 def getNorms():
+
+    r =request
 
     if 'parCode' in request.args.keys():
         parCode = request.args['parCode']
@@ -131,15 +137,12 @@ def getNorms():
 
         allInfo['norms'] = normsForSubstance
 
-        # resp = Response(json.dumps(allInfo))
-        # resp.headers['Access-Control-Allow-Origin'] = '*'
-        # resp.headers['Access-Control-Allow-Headers'] = 'Content-Type'
-        # resp.headers['Access-Control-Allow-Methods'] = 'DELETE, GET, HEAD, OPTIONS, PATCH, POST, PUT'
-        # resp.mimetype = 'application/json'
-        # return resp
         return json.dumps(allInfo)
+    elif request.query_string == "":    # empty query string: return all
+        return json.dumps(RIVMDict)
     else:
-        return "Please give a valid aquo code 'parCode' as GET parameter"
+        return "Please give a valid aquo code 'parCode' as GET parameter, or leave out the GET parameter to obtain all norms and substances"
+        return json.dumps(RIVMDict)
 
 
 
@@ -190,19 +193,7 @@ def getLocations():
     uniqLocationsDict['type'] = "FeatureCollection"
     uniqLocationsDict['features'] = uniqLocList
 
-    #resp = Response(json.dumps(uniqLocationsDict))
-    #resp.headers['Access-Control-Allow-Origin'] = '*'
-    #.mimetype = 'application/json'
-    #return resp
-
-    # resp = Response(json.dumps(uniqLocList))
-    # resp.headers['Access-Control-Allow-Origin'] = '*'
-    # resp.headers['Access-Control-Allow-Headers'] = 'Content-Type'
-    # resp.headers['Access-Control-Allow-Methods'] = 'DELETE, GET, HEAD, OPTIONS, PATCH, POST, PUT'
-    # resp.mimetype = 'application/json'
-    # return resp
-
-    return json.dumps(uniqLocList)
+    return json.dumps(uniqLocationsDict)
 
 
 @app.route('/parameters', methods=['GET', 'OPTIONS'])
@@ -232,10 +223,6 @@ def getParameters():
     uniqParList = sorted(uniqParList, key=itemgetter('aquoParOmschrijving'))  # sort alphabetically
 
     return json.dumps(uniqParList)
-    # resp = Response(json.dumps(uniqParList))
-    # resp.headers['Access-Control-Allow-Origin'] = '*'
-    # resp.mimetype = 'application/json'
-    # return resp
 
 
 @app.route('/avg', methods=['GET', 'OPTIONS'])
