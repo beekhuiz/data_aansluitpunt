@@ -7,3 +7,5 @@ MongoDB
 *.py[cod]
 
 config.ini
+
+RIVMNormDB.json

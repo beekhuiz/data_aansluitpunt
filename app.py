@@ -1,15 +1,55 @@
-import os
-from flask import Flask, current_app, Response, make_response, jsonify, request, render_template, session, redirect, url_for, flash, send_from_directory
+import os, sys
+from flask import Flask, current_app, make_response, request, render_template
 from pymongo import MongoClient
 import requests
-from requests.auth import HTTPBasicAuth
-#import gis_functions       # NOT NEEDED (YET)
 import json
 from operator import itemgetter  # used for sorting dictionary lists of unique locations, parameters and sources alphabetically
-#from flask.ext.cors import CORS # somehow doesnt work?
 from datetime import timedelta
 from functools import update_wrapper
 import ConfigParser
+import atexit
+
+from apscheduler.schedulers.background import BackgroundScheduler
+
+sched = BackgroundScheduler()
+normsList = []
+substancesList = []
+
+# Define the function that is to be executed
+def updateRIVMDB():
+
+    print("Reading RIVM DATA")
+
+    # set norms and substanceslist to global; we want to change the global variables
+    global normsList
+    global substancesList
+
+    # Retrieve the latest RIVM Norm database when starting the script
+    try:
+        RIVMString = requests.get('https://rvs.rivm.nl/zoeksysteem/Data/SubtanceNormValues')
+        fo = open('RIVMNormDB.json', 'w')
+        fo.write(RIVMString.content)
+        fo.close()
+    except:
+        print "Error in retrieving RIVM Norm database"
+
+    # load in the RIVM norm database
+    try:
+        with open('RIVMNormDB.json') as RIVMDataFile:
+            RIVMDict = json.load(RIVMDataFile)  # convert json string to python dict
+            normsList = RIVMDict['norms']
+            substancesList = RIVMDict['substances']
+    except:
+        print "Error in loading RIVM norms database, exiting"
+        sys.exit()
+
+
+# Explicitly kick off the background thread
+sched.add_job(updateRIVMDB, 'interval', start_date='2016-07-20 02:00:00', days=1)
+sched.start()
+
+# load the data at the start
+updateRIVMDB()
 
 Config = ConfigParser.ConfigParser()
 Config.read("config.ini")
@@ -21,23 +61,13 @@ app.config['DEVELOP'] = Config.get('SectionOne', 'develop') in ['True', 'true', 
 
 my_dir = os.path.dirname(__file__)
 
-# Load in norm data in memory for fast access
-RIVMString = requests.get('https://rvs.rivm.nl/zoeksysteem/Data/SubtanceNormValues')
-RIVMDict = json.loads(RIVMString.text)  # convert json string to python dict
-normsList = RIVMDict['norms']
-substancesList = RIVMDict['substances']
+
+
 
 
 def crossdomain(origin=None, methods=None, headers=None, max_age=21600, attach_to_all=True, automatic_options=True):
     """
     This function set all header information to allow for crossdomain requests
-    :param origin:
-    :param methods:
-    :param headers:
-    :param max_age:
-    :param attach_to_all:
-    :param automatic_options:
-    :return:
     """
 
     if methods is not None:
@@ -251,6 +281,7 @@ def getParameters():
     return json.dumps(uniqParList)
 
 
+
 @app.route('/avg', methods=['GET', 'OPTIONS'])
 @crossdomain(origin='*')
 def getAverage():
@@ -287,6 +318,10 @@ def getAverage():
 
     else:
         return "Please give a parCode and/or a locID as request parameters"
+
+
+# Shutdown the scheduler thread if the web process is stopped
+atexit.register(sched.shutdown(wait=False))
 
 
 if __name__ == '__main__':
