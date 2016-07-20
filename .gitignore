@@ -11,3 +11,4 @@ config.ini
 RIVMNormDB.json
 
 startmongoDB.bat
+startapp.bat
