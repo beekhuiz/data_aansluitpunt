@@ -1,6 +1,6 @@
 import os, sys
 from flask import Flask, current_app, make_response, request, render_template
-from pymongo import MongoClient
+import pymongo
 import requests
 import json
 from operator import itemgetter  # used for sorting dictionary lists of unique locations, parameters and sources alphabetically
@@ -8,10 +8,10 @@ from datetime import timedelta
 from functools import update_wrapper
 import ConfigParser
 import atexit
-
 from apscheduler.schedulers.background import BackgroundScheduler
 
 sched = BackgroundScheduler()
+RIVMDict = {}
 normsList = []
 substancesList = []
 
@@ -20,17 +20,19 @@ def updateRIVMDB():
 
     print("Reading RIVM DATA")
 
-    # set norms and substanceslist to global; we want to change the global variables
+    # set RIVMDict, norms and substanceslist to global; we want to change the global variables
+    global RIVMDict
     global normsList
     global substancesList
 
     # Retrieve the latest RIVM Norm database when starting the script
-    try:
-        RIVMString = requests.get('https://rvs.rivm.nl/zoeksysteem/Data/SubtanceNormValues')
+    r = requests.get('https://rvs.rivm.nl/zoeksysteem/Data/SubtanceNormValues')
+
+    if r.status_code == 200:
         fo = open('RIVMNormDB.json', 'w')
-        fo.write(RIVMString.content)
+        fo.write(r.content)
         fo.close()
-    except:
+    else:
         print "Error in retrieving RIVM Norm database"
 
     # load in the RIVM norm database
@@ -45,7 +47,7 @@ def updateRIVMDB():
 
 
 # Explicitly kick off the background thread
-sched.add_job(updateRIVMDB, 'interval', start_date='2016-07-20 02:00:00', days=1)
+sched.add_job(updateRIVMDB, 'interval', id='rivm_dbupdate_id', days=1, start_date='2016-07-20 03:30:00')
 sched.start()
 
 # load the data at the start
@@ -60,8 +62,6 @@ app.config['SECRET_KEY'] = Config.get('SectionOne', 'secret_key')
 app.config['DEVELOP'] = Config.get('SectionOne', 'develop') in ['True', 'true', '1']
 
 my_dir = os.path.dirname(__file__)
-
-
 
 
 
@@ -123,8 +123,6 @@ def getNorms():
     """
     get the norms for a substance, or get all norms
     """
-
-    r =request
 
     if 'parCode' in request.args.keys():
         parCode = request.args['parCode']
@@ -190,8 +188,6 @@ def getNorms():
         return json.dumps(RIVMDict)
     else:
         return "Please give a valid aquo code 'parCode' as GET parameter, or leave out the GET parameter to obtain all norms and substances"
-        return json.dumps(RIVMDict)
-
 
 
 @app.route('/locations', methods=['GET', 'OPTIONS'])
@@ -214,12 +210,8 @@ def getLocations():
     if searchList:
         searchDict["$and"] = searchList
 
-    client = MongoClient()
-    db = client.EI_Toets
-    collection = db["EIData"]
 
     mongocursor = collection.find(searchDict)
-
     timeseries = []
 
     for record in mongocursor:
@@ -255,10 +247,6 @@ def getParameters():
     Get all the Aquo parameters in the database
     :return:
     """
-
-    client = MongoClient()
-    db = client.EI_Toets
-    collection = db["EIData"]
 
     searchDict = {} # potential for selecting a subset
     mongocursor = collection.find(searchDict)
@@ -300,9 +288,6 @@ def getAverage():
         searchList.append({"properties.locID": request.args['locID']})
 
     if searchList:
-        client = MongoClient()
-        db = client.EI_Toets
-        collection = db["EIData"]
 
         searchDict = {} # potential for selecting a subset
         searchDict["$and"] = searchList
@@ -320,15 +305,30 @@ def getAverage():
         return "Please give a parCode and/or a locID as request parameters"
 
 
-# Shutdown the scheduler thread if the web process is stopped
-atexit.register(sched.shutdown(wait=False))
+# Shutdown the scheduler thread if the web process is stopped;
+atexit.register(lambda: sched.shutdown(wait=False))
 
 
 if __name__ == '__main__':
 
+    # connect to database
+    client = pymongo.MongoClient(serverSelectionTimeoutMS=1)
+    db = client.EI_Toets
+    collection = db["EIData"]
+
+    # test if connection to MongoDB works
+    try:
+        client.server_info()
+    except pymongo.errors.ServerSelectionTimeoutError as err:
+        print(err)
+        print "Error in connecting or creating MongoDB collection; have you started MongoDB?"
+        sys.exit()
+
+
+    # run the app with use_reloader=False to ensure that apscheduler is not run twice
     if app.config['DEVELOP']:
-        app.run(debug=True)                 # DEVELOPMENT
+        app.run(debug=True, use_reloader=False)                # DEVELOPMENT
     else:
-        app.run(host='0.0.0.0')            # SERVER
+        app.run(host='0.0.0.0', use_reloader=False)            # SERVER
 
 
