@@ -5,5 +5,10 @@ This tool consists of two parts:
 
 In order to run both the data_aansluitpunt and the script, MongoDB needs to be installed. The required python packages are listed in requirements.txt.
 
+The data_aansluitpunt needs a config.ini file with the following structure:
+[SectionOne]
+secret_key: [insert secret key]
+develop: [True or False]
+
 
 
