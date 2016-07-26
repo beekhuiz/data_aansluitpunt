@@ -2,7 +2,6 @@ Requirements for data_aansluitpunt:
 flask
 requests
 pymongo
-gdal 2.0.2
 apscheduler
 
 Requirements for Compute_3YearAvg_DDL:

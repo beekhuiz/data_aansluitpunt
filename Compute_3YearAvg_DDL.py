@@ -10,7 +10,7 @@ from Rijkswaterstaat.
 All results are stored in a MongoDB database. Therefore, a MongoDB service (mongod.exe) should be running
 in order to write the results to the database.
 Optionally, the downloaded JSON data from de DDL are stored for reference in a directory set in the INPUT PARAMETERS
-on top of this script.
+on top of this script (storeDDLFiles = True)
 
 The calculation method for determining the 3-yr average is obtained from the RIVM normendatase:
 https://acceptatie.rvs.rivm.nl/Data/SubtanceNormValues

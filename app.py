@@ -47,7 +47,7 @@ def updateRIVMDB():
 
 
 # Explicitly kick off the background thread
-sched.add_job(updateRIVMDB, 'interval', id='rivm_dbupdate_id', days=1, start_date='2016-07-20 03:30:00')
+sched.add_job(updateRIVMDB, 'interval', id='rivm_dbupdate_id', days=7, start_date='2016-07-24 03:30:00')
 sched.start()
 
 # load the data at the start
